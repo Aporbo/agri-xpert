@@ -20,6 +20,7 @@ const FarmerDashboard = () => {
   const [message, setMessage] = useState('');
   const [alerts, setAlerts] = useState([]);
   const [irrigationPlans, setIrrigationPlans] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchWeather();
@@ -50,6 +51,7 @@ const FarmerDashboard = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const payload = {
       soilType: soilForm.soilType,
       pH: parseFloat(soilForm.pH),
@@ -62,14 +64,34 @@ const FarmerDashboard = () => {
     try {
       const res = await axios.post('/farmer/soil-test', payload);
       setMessage(res.data.message);
-      const recRes = await axios.get(`/farmer/recommendation/${res.data.soilTest._id}`);
-      setSelectedRecommendation(recRes.data);
+      
+      // Get recommendation - it might take some time to generate
+      let recommendation;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      while (attempts < maxAttempts) {
+        try {
+          const recRes = await axios.get(`/farmer/recommendation/${res.data.soilTest._id}`);
+          recommendation = recRes.data;
+          break;
+        } catch (err) {
+          if (attempts === maxAttempts - 1) throw err;
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        }
+      }
+      
+      setSelectedRecommendation(recommendation);
       setAlerts(generateAlertMessage(payload, weather));
       setSoilForm({
         soilType: '', pH: '', moisture: '', nitrogen: '', phosphorus: '', potassium: ''
       });
-    } catch {
-      setMessage('❌ Submission failed');
+    } catch (err) {
+      setMessage('❌ Submission failed. Please try again.');
+      console.error('Submission error:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -78,7 +100,13 @@ const FarmerDashboard = () => {
       <h2 className="text-4xl font-extrabold text-green-700 mb-4">👨‍🌾 Welcome to Your Dashboard</h2>
       <p className="text-gray-600 text-lg mb-6">Submit tests, get recommendations and manage irrigation smarter with real-time insights.</p>
 
-      {message && <div className="bg-green-100 text-green-800 p-3 rounded shadow">{message}</div>}
+      {message && (
+        <div className={`p-3 rounded shadow ${
+          message.includes('❌') ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+        }`}>
+          {message}
+        </div>
+      )}
 
       {/* Weather */}
       {weather && (
@@ -130,13 +158,20 @@ const FarmerDashboard = () => {
               value={soilForm[field]}
               onChange={handleChange}
               type="number"
+              step="any"
               className="border p-2 rounded text-sm"
               required
             />
           ))}
           <div className="col-span-2">
-            <button type="submit" className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition">
-              🚀 Submit Soil Test
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full py-2 rounded transition ${
+                isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {isSubmitting ? 'Processing...' : '🚀 Submit Soil Test'}
             </button>
           </div>
         </form>
@@ -146,15 +181,30 @@ const FarmerDashboard = () => {
       {selectedRecommendation && (
         <div className="bg-white shadow-md rounded-lg p-6 animate-fade-in space-y-6">
           <h3 className="text-xl font-bold text-indigo-700">📋 Your AI-Powered Recommendation</h3>
+          {selectedRecommendation.status === 'pending' && (
+            <div className="bg-yellow-100 text-yellow-800 p-3 rounded text-sm mb-4">
+              ⏳ Your recommendation is being reviewed by our experts. This might take some time.
+            </div>
+          )}
 
           <div className="flex gap-4 items-center">
             <img src={cropImg} alt="Crop" className="w-32 h-24 rounded object-cover" />
-            <p><strong>Suggested Crop:</strong> {selectedRecommendation.cropSuggestion}</p>
+            <div>
+              <p><strong>Suggested Crop:</strong> {selectedRecommendation.cropSuggestion}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Source: {selectedRecommendation.source}
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-4 items-center">
             <img src={fertilizerImg} alt="Fertilizer" className="w-32 h-24 rounded object-cover" />
-            <p><strong>Fertilizer Plan:</strong> {selectedRecommendation.fertilizerSuggestion}</p>
+            <div>
+              <p><strong>Fertilizer Plan:</strong> {selectedRecommendation.fertilizerSuggestion}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Status: {selectedRecommendation.status}
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-4 items-center">
@@ -185,7 +235,7 @@ const FarmerDashboard = () => {
         )}
       </div>
 
-      {/* Farming Tips (Dummy Section) */}
+      {/* Farming Tips */}
       <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-lg shadow-md space-y-2 animate-fade-in">
         <h3 className="text-lg font-bold text-green-800">🌾 Pro Tip of the Day</h3>
         <p className="text-sm text-green-700">

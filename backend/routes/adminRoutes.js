@@ -6,34 +6,35 @@ const User = require('../models/User');
 const SoilTest = require('../models/SoilTest');
 const Recommendation = require('../models/Recommendation');
 
-// Protect routes
+// ✅ Protect all admin routes
 router.use(verifyToken, authorizeRoles('ADMIN'));
 
-// User management
+// ✅ User management
 router.get('/users', adminController.getAllUsers);
 router.post('/users', adminController.createUser);
 router.put('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
 
-// Soil tests
+// ✅ Soil tests
 router.get('/soiltests', adminController.getAllSoilTests);
 router.delete('/soiltests/:id', async (req, res) => {
   try {
     await SoilTest.findByIdAndDelete(req.params.id);
     res.json({ message: 'Soil test deleted' });
-  } catch {
+  } catch (error) {
+    console.error('Delete soil test error:', error);
     res.status(500).json({ message: 'Failed to delete soil test' });
   }
 });
 
-// Recommendations
+// ✅ Recommendations
 router.post('/recommendation/:soilTestId', adminController.createRecommendation);
 
-// Rules
+// ✅ Rules
 router.get('/rules', adminController.getRules);
 router.post('/rules', adminController.setRules);
 
-// Summary Stats
+// ✅ Summary Stats
 router.get('/stats', async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -56,9 +57,11 @@ router.get('/stats', async (req, res) => {
       tests: totalTests,
       recommendations: totalRecommendations
     });
-  } catch {
+  } catch (error) {
+    console.error('Stats error:', error);
     res.status(500).json({ message: 'Failed to fetch stats' });
   }
 });
 
+// ✅ Export the router
 module.exports = router;

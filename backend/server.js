@@ -19,7 +19,7 @@ connectDB();
 const app = express();
 app.use(cors());
 app.use(express.json());
-const farmerRoutes = require('./routes/farmerRoutes');
+console.log('typeof adminRoutes:', typeof adminRoutes); // should be 'function'
 
 
 // Mount routes

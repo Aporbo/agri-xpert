@@ -90,15 +90,17 @@ exports.getWeather = async (req, res) => {
 // Get Recommendation for a Soil Test
 exports.getRecommendation = async (req, res) => {
   try {
-    const recommendation = await Recommendation.findOne({ soilTest: req.params.soilTestId });
+    const recommendation = await Recommendation.findOne({ soilTest: req.params.soilTestId }).populate('soilTest');
     if (!recommendation) {
       return res.status(404).json({ message: 'No recommendation found' });
     }
-    res.json(recommendation);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch recommendation' });
+    res.status(200).json(recommendation);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 exports.updateProfile = async (req, res) => {
   try {
@@ -148,5 +150,10 @@ exports.updatePassword = async (req, res) => {
     console.error('Password update error:', error);
     res.status(500).json({ message: 'Failed to update password', error: error.message });
   }
+};
+exports.getProfile = async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password');
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  res.json(user);
 };
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from '../../api/axiosInstance';
-import { FiUsers, FiDatabase, FiSettings, FiHome, FiBarChart2, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiUsers, FiDatabase, FiSettings, FiHome, FiBarChart2, FiTrash2, FiPlus, FiClock, FiCheck, FiX } from 'react-icons/fi';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
@@ -10,11 +10,15 @@ const AdminDashboard = () => {
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeRecommendation, setActiveRecommendation] = useState(null);
+  const [pendingRules, setPendingRules] = useState([]);
+  const [pendingRecommendations, setPendingRecommendations] = useState([]);
   const [isLoading, setIsLoading] = useState({
     users: false,
     soilTests: false,
     rules: false,
-    stats: false
+    stats: false,
+    pendingRules: false,
+    pendingRecs: false
   });
 
   useEffect(() => {
@@ -22,6 +26,8 @@ const AdminDashboard = () => {
     if (activeTab === 'users') fetchUsers();
     if (activeTab === 'soiltests') fetchSoilTests();
     if (activeTab === 'rules') fetchRules();
+    if (activeTab === 'pending-rules') fetchPendingRules();
+    if (activeTab === 'pending-recs') fetchPendingRecommendations();
   }, [activeTab]);
 
   const fetchUsers = async () => {
@@ -69,6 +75,30 @@ const AdminDashboard = () => {
       setMessage('Failed to fetch summary stats');
     } finally {
       setIsLoading(prev => ({ ...prev, stats: false }));
+    }
+  };
+
+  const fetchPendingRules = async () => {
+    setIsLoading(prev => ({ ...prev, pendingRules: true }));
+    try {
+      const res = await axios.get('/admin/pending-rules');
+      setPendingRules(res.data);
+    } catch {
+      setMessage('Failed to fetch pending rules');
+    } finally {
+      setIsLoading(prev => ({ ...prev, pendingRules: false }));
+    }
+  };
+
+  const fetchPendingRecommendations = async () => {
+    setIsLoading(prev => ({ ...prev, pendingRecs: true }));
+    try {
+      const res = await axios.get('/admin/pending-recommendations');
+      setPendingRecommendations(res.data);
+    } catch {
+      setMessage('Failed to fetch pending recommendations');
+    } finally {
+      setIsLoading(prev => ({ ...prev, pendingRecs: false }));
     }
   };
 
@@ -136,6 +166,26 @@ const AdminDashboard = () => {
     }
   };
 
+  const reviewRuleProposal = async (id, action) => {
+    try {
+      await axios.put(`/admin/review-rule/${id}`, { action });
+      fetchPendingRules();
+      setMessage(`Rule proposal ${action === 'approve' ? 'approved' : 'rejected'}`);
+    } catch {
+      setMessage('Failed to process rule proposal');
+    }
+  };
+
+  const approveRecommendation = async (id) => {
+    try {
+      await axios.put(`/admin/approve-recommendation/${id}`);
+      fetchPendingRecommendations();
+      setMessage('Recommendation approved');
+    } catch {
+      setMessage('Failed to approve recommendation');
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -172,6 +222,20 @@ const AdminDashboard = () => {
             <FiSettings className="mr-3" />
             Soil Rules
           </button>
+          <button
+            onClick={() => setActiveTab('pending-rules')}
+            className={`flex items-center w-full p-2 rounded-lg ${activeTab === 'pending-rules' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'}`}
+          >
+            <FiClock className="mr-3" />
+            Pending Rules
+          </button>
+          <button
+            onClick={() => setActiveTab('pending-recs')}
+            className={`flex items-center w-full p-2 rounded-lg ${activeTab === 'pending-recs' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'}`}
+          >
+            <FiClock className="mr-3" />
+            Pending Recs
+          </button>
         </nav>
       </div>
 
@@ -185,6 +249,8 @@ const AdminDashboard = () => {
               {activeTab === 'users' && 'User Management'}
               {activeTab === 'soiltests' && 'Soil Tests'}
               {activeTab === 'rules' && 'Soil Rule Settings'}
+              {activeTab === 'pending-rules' && 'Pending Rule Proposals'}
+              {activeTab === 'pending-recs' && 'Pending Recommendations'}
             </h2>
             {message && (
               <div className={`px-4 py-2 rounded ${message.includes('Failed') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -253,6 +319,9 @@ const AdminDashboard = () => {
                         <div className="ml-4">
                           <h3 className="text-lg font-medium text-gray-500">Recommendations</h3>
                           <p className="text-3xl font-bold">{stats.recommendations}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {stats.pendingRecs} pending review
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -415,6 +484,9 @@ const AdminDashboard = () => {
                                 <div className="mb-2">
                                   <p className="text-sm text-gray-500">Recommended Crop</p>
                                   <p className="font-medium">{activeRecommendation.cropSuggestion}</p>
+                                  <p className="text-xs text-gray-400">
+                                    Source: {activeRecommendation.source}
+                                  </p>
                                 </div>
                                 <div>
                                   <p className="text-sm text-gray-500">Recommended Fertilizer</p>
@@ -501,6 +573,114 @@ const AdminDashboard = () => {
                     </button>
                   </div>
                 </form>
+              )}
+            </div>
+          )}
+
+          {/* Pending Rules Tab */}
+          {activeTab === 'pending-rules' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold mb-6">Pending Rule Proposals</h3>
+              {isLoading.pendingRules ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : pendingRules.length > 0 ? (
+                <div className="space-y-4">
+                  {pendingRules.map(rule => (
+                    <div key={rule._id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">Proposed by: {rule.createdBy?.name || 'Unknown'}</h4>
+                          <p className="text-sm text-gray-500">
+                            Submitted: {new Date(rule.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => reviewRuleProposal(rule._id, 'approve')}
+                            className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
+                            title="Approve"
+                          >
+                            <FiCheck />
+                          </button>
+                          <button
+                            onClick={() => reviewRuleProposal(rule._id, 'reject')}
+                            className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
+                            title="Reject"
+                          >
+                            <FiX />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                        {Object.entries(rule).filter(([key]) => !['_id', 'createdBy', 'createdAt', '__v'].includes(key)).map(([key, value]) => (
+                          <div key={key} className="bg-gray-50 p-2 rounded">
+                            <p className="font-medium">{key}:</p>
+                            <p className="text-gray-700">
+                              {typeof value === 'object' ? JSON.stringify(value) : value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No pending rule proposals</p>
+              )}
+            </div>
+          )}
+
+          {/* Pending Recommendations Tab */}
+          {activeTab === 'pending-recs' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold mb-6">Pending Recommendations</h3>
+              {isLoading.pendingRecs ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : pendingRecommendations.length > 0 ? (
+                <div className="space-y-4">
+                  {pendingRecommendations.map(rec => (
+                    <div key={rec._id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">Soil Test #{rec.soilTest?._id?.slice(-6) || 'Unknown'}</h4>
+                          <p className="text-sm text-gray-500">
+                            Generated by: {rec.generatedBy?.name || 'System'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => approveRecommendation(rec._id)}
+                          className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                        >
+                          Approve
+                        </button>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-500">Recommended Crop</p>
+                          <p className="font-medium">{rec.cropSuggestion}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Recommended Fertilizer</p>
+                          <p className="font-medium">{rec.fertilizerSuggestion}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Source</p>
+                          <p className="font-medium capitalize">{rec.source}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Status</p>
+                          <p className="font-medium capitalize">{rec.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No pending recommendations</p>
               )}
             </div>
           )}

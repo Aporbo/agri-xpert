@@ -1,35 +1,35 @@
 const express = require('express');
-const router = express.Router();
+const router = express.Router(); // ✅ CORRECT
 const { verifyToken, authorizeRoles } = require('../middlewares/authMiddleware');
 const {
   submitSoilTest,
   getMySoilTests,
   getWeather,
-  getRecommendation
-} = require('../controllers/farmerController');
-
-
-
-const {
-  getProfile,
+  getRecommendation, // ✅ This must be present
   updateProfile,
   updatePassword
 } = require('../controllers/farmerController');
 
 
+
+
 const PDFDocument = require('pdfkit');
 const SoilTest = require('../models/SoilTest');
 
+
+console.log('verifyToken typeof:', typeof verifyToken);
+console.log('authorizeRoles typeof:', typeof authorizeRoles);
+console.log('authorizeRoles(...) typeof:', typeof authorizeRoles('FARMER', 'ADMIN'));
 router.post('/soil-test', verifyToken, authorizeRoles('FARMER'), submitSoilTest);
 router.get('/my-tests', verifyToken, authorizeRoles('FARMER'), getMySoilTests);
 router.get('/weather', verifyToken, authorizeRoles('FARMER'), getWeather);
 router.get('/recommendation/:soilTestId', verifyToken, authorizeRoles('FARMER', 'ADMIN'), getRecommendation);
-
-router.get('/profile', verifyToken, authorizeRoles('FARMER'), getProfile);
+console.log('typeof getRecommendation:', typeof getRecommendation); // should be 'function'
 router.put('/profile', verifyToken, authorizeRoles('FARMER'), updateProfile);
 router.put('/profile/password', verifyToken, authorizeRoles('FARMER'), updatePassword);
 
-// PDF download route
+
+
 router.get('/download/:soilTestId', verifyToken, authorizeRoles('FARMER'), async (req, res) => {
   try {
     const recommendation = await Recommendation.findOne({ soilTest: req.params.soilTestId }).populate('soilTest');
@@ -57,5 +57,5 @@ router.get('/download/:soilTestId', verifyToken, authorizeRoles('FARMER'), async
     res.status(500).json({ message: 'Failed to generate PDF' });
   }
 });
-
 module.exports = router;
+
