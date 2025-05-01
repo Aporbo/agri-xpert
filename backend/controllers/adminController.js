@@ -97,20 +97,79 @@ exports.createRecommendation = async (req, res) => {
 // Rules
 exports.setRules = async (req, res) => {
   try {
-    const exists = await SoilRule.findOne();
-    if (exists) await SoilRule.updateOne({}, req.body);
-    else await new SoilRule(req.body).save();
-    res.json({ message: 'Rules updated' });
+    // Destructure only the fields you want
+    const {
+      soilType,
+      pH,
+      moisture,
+      nitrogen,
+      phosphorus,
+      potassium,
+      cropSuggestion,
+      fertilizerSuggestion,
+      irrigationRecommendation
+    } = req.body;
+
+    // Build a new rule object (no manual 'id')
+    const rule = new SoilRule({
+      soilType,
+      pH,
+      moisture,
+      nitrogen,
+      phosphorus,
+      potassium,
+      cropSuggestion,
+      fertilizerSuggestion,
+      irrigationRecommendation,
+      status: 'APPROVED' // optional default status
+    });
+
+    await rule.save();
+    res.status(201).json({ message: 'Rule added successfully', rule });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update rules' });
+    console.error('[Admin] Save Rule Error:', error);
+    res.status(500).json({ message: 'Failed to add rule' });
   }
 };
 
+
+
 exports.getRules = async (req, res) => {
   try {
-    const rules = await SoilRule.findOne();
-    res.json(rules || {});
+    const rules = await SoilRule.find(); // ✅ Returns all
+    res.json(rules);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch rules' });
+  }
+};
+
+
+exports.getPendingRules = async (req, res) => {
+  try {
+    const rules = await SoilRule.find({ status: 'PENDING' }).populate('createdBy', 'name email');
+    res.json(rules);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch pending rules' });
+  }
+};
+
+exports.reviewRuleProposal = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['APPROVED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const rule = await SoilRule.findByIdAndUpdate(
+      req.params.id,
+      { status, updatedOn: new Date() },
+      { new: true }
+    );
+
+    if (!rule) return res.status(404).json({ message: 'Rule not found' });
+
+    res.json({ message: `Rule ${status.toLowerCase()}`, rule });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update rule' });
   }
 };

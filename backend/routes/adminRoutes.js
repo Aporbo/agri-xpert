@@ -5,17 +5,18 @@ const adminController = require('../controllers/adminController');
 const User = require('../models/User');
 const SoilTest = require('../models/SoilTest');
 const Recommendation = require('../models/Recommendation');
+const SoilRule = require('../models/SoilRule');
 
 // ✅ Protect all admin routes
 router.use(verifyToken, authorizeRoles('ADMIN'));
 
-// ✅ User management
+// ✅ User Management
 router.get('/users', adminController.getAllUsers);
 router.post('/users', adminController.createUser);
 router.put('/users/:id', adminController.updateUser);
 router.delete('/users/:id', adminController.deleteUser);
 
-// ✅ Soil tests
+// ✅ Soil Tests
 router.get('/soiltests', adminController.getAllSoilTests);
 router.delete('/soiltests/:id', async (req, res) => {
   try {
@@ -30,9 +31,25 @@ router.delete('/soiltests/:id', async (req, res) => {
 // ✅ Recommendations
 router.post('/recommendation/:soilTestId', adminController.createRecommendation);
 
-// ✅ Rules
+// ✅ Rules (Main)
 router.get('/rules', adminController.getRules);
 router.post('/rules', adminController.setRules);
+
+// ✅ DELETE Rule — must be placed here BEFORE 'pending' and 'review' routes
+router.delete('/rules/:id', async (req, res) => {
+  try {
+    const deleted = await SoilRule.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'Rule not found' });
+    res.json({ message: 'Rule deleted' });
+  } catch (error) {
+    console.error('Delete rule error:', error);
+    res.status(500).json({ message: 'Failed to delete rule' });
+  }
+});
+
+// ✅ Rule Moderation
+router.get('/rules/pending', adminController.getPendingRules);
+router.put('/rules/review/:id', adminController.reviewRuleProposal);
 
 // ✅ Summary Stats
 router.get('/stats', async (req, res) => {

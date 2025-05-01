@@ -6,15 +6,20 @@ const {
   getIrrigationPlans,
   getSoilInsights,
   getRecommendationTrends,
-  getRuleAudit
+  getRuleAudit,
+  proposeRules,
+  getPendingRecommendations // ✅ Add this line
 } = require('../controllers/researcherController');
 
-router.use(verifyToken, authorizeRoles('RESEARCHER'));
+// ✅ Allow researchers only
+router.get('/weather', verifyToken, authorizeRoles('RESEARCHER'), getWeather);
+router.get('/soil-insights', verifyToken, authorizeRoles('RESEARCHER'), getSoilInsights);
+router.get('/trends', verifyToken, authorizeRoles('RESEARCHER'), getRecommendationTrends);
+router.get('/rules', verifyToken, authorizeRoles('RESEARCHER'), getRuleAudit);
+//router.get('/recommendations-for-review', verifyToken, authorizeRoles('RESEARCHER'), getPendingRecommendations); // ✅ New route
+router.post('/propose-rules', verifyToken, authorizeRoles('RESEARCHER'), proposeRules);
 
-router.get('/weather', getWeather);
-router.get('/irrigation', getIrrigationPlans);
-router.get('/soil-insights', getSoilInsights);
-router.get('/trends', getRecommendationTrends);
-router.get('/rules', getRuleAudit);
+// ✅ Shared route
+router.get('/irrigation', verifyToken, authorizeRoles('FARMER', 'RESEARCHER'), getIrrigationPlans);
 
 module.exports = router;

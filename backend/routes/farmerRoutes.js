@@ -1,35 +1,44 @@
 const express = require('express');
-const router = express.Router(); // ✅ CORRECT
-const { verifyToken, authorizeRoles } = require('../middlewares/authMiddleware');
+const router = express.Router();
+
 const {
   submitSoilTest,
   getMySoilTests,
   getWeather,
-  getRecommendation, // ✅ This must be present
+  getRecommendation,
   updateProfile,
-  updatePassword
+  updatePassword,
+  getIrrigationPlans // ✅ Add this here instead
 } = require('../controllers/farmerController');
 
-
-
+const { verifyToken, authorizeRoles } = require('../middlewares/authMiddleware');
 
 const PDFDocument = require('pdfkit');
+const Recommendation = require('../models/Recommendation');
 const SoilTest = require('../models/SoilTest');
-
 
 console.log('verifyToken typeof:', typeof verifyToken);
 console.log('authorizeRoles typeof:', typeof authorizeRoles);
 console.log('authorizeRoles(...) typeof:', typeof authorizeRoles('FARMER', 'ADMIN'));
+
+// 🧪 Soil Test
 router.post('/soil-test', verifyToken, authorizeRoles('FARMER'), submitSoilTest);
 router.get('/my-tests', verifyToken, authorizeRoles('FARMER'), getMySoilTests);
+
+// 🌦 Weather
 router.get('/weather', verifyToken, authorizeRoles('FARMER'), getWeather);
+
+// 📋 Recommendation
 router.get('/recommendation/:soilTestId', verifyToken, authorizeRoles('FARMER', 'ADMIN'), getRecommendation);
-console.log('typeof getRecommendation:', typeof getRecommendation); // should be 'function'
+
+// 💧 Irrigation (✅ Fix here)
+router.get('/irrigation', verifyToken, authorizeRoles('FARMER'), getIrrigationPlans);
+
+// 👤 Profile
 router.put('/profile', verifyToken, authorizeRoles('FARMER'), updateProfile);
 router.put('/profile/password', verifyToken, authorizeRoles('FARMER'), updatePassword);
 
-
-
+// 📄 PDF Report
 router.get('/download/:soilTestId', verifyToken, authorizeRoles('FARMER'), async (req, res) => {
   try {
     const recommendation = await Recommendation.findOne({ soilTest: req.params.soilTestId }).populate('soilTest');
@@ -57,5 +66,5 @@ router.get('/download/:soilTestId', verifyToken, authorizeRoles('FARMER'), async
     res.status(500).json({ message: 'Failed to generate PDF' });
   }
 });
-module.exports = router;
 
+module.exports = router;

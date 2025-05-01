@@ -20,51 +20,51 @@ exports.submitSoilTest = async (req, res) => {
       phosphorus,
       potassium
     });
-    const rules = await SoilRule.findOne();
 
     await soilTest.save();
 
-    // 2. Rule-based recommendation logic
-    let crop = 'Sorghum';
-    let fertilizer = 'Compost + NPK';
+    // 2. Try rule-based matching
+    const allRules = await SoilRule.find({});
 
-    if (pH >= 6 && pH <= 7.5 && nitrogen > 20 && phosphorus > 20) {
-      crop = 'Wheat';
-      fertilizer = 'Urea + DAP';
-    } else if (moisture > 60 && phosphorus > 25 && pH < 6.8) {
-      crop = 'Rice';
-      fertilizer = 'Potash + SSP';
-    } else if (potassium < 20 && pH < 5.5) {
-      crop = 'Groundnut';
-      fertilizer = 'Gypsum + Lime';
+    let matchedRule = allRules.find(rule => {
+      return (
+        rule.soilType === soilType &&
+        pH >= rule.pH.min && pH <= rule.pH.max &&
+        moisture >= rule.moisture.min && moisture <= rule.moisture.max &&
+        nitrogen >= rule.nitrogen.min && nitrogen <= rule.nitrogen.max &&
+        phosphorus >= rule.phosphorus.min && phosphorus <= rule.phosphorus.max &&
+        potassium >= rule.potassium.min && potassium <= rule.potassium.max
+      );
+    });
+
+    let crop = 'N/A';
+    let fertilizer = 'N/A';
+
+    if (matchedRule) {
+      crop = matchedRule.cropSuggestion;
+      fertilizer = matchedRule.fertilizerSuggestion;
+      irrigation = matchedRule.irrigationRecommendation;
     }
 
-    // 3. Try ML-based override (optional)
-    try {
-      const mlData = await getMLRecommendation(req.body);
-      if (mlData?.crop) crop = mlData.crop;
-      if (mlData?.fertilizer) fertilizer = mlData.fertilizer;
-    } catch (mlError) {
-      console.warn('ML Recommendation not available or failed:', mlError.message);
-    }
-
-    // 4. Save recommendation
+    // 3. Save recommendation
     const recommendation = new Recommendation({
       soilTest: soilTest._id,
       cropSuggestion: crop,
       fertilizerSuggestion: fertilizer,
+      irrigationRecommendation: irrigation, // ✅ include this
       generatedBy: req.user.id
     });
 
     await recommendation.save();
 
     res.status(201).json({ message: 'Soil Test submitted successfully', soilTest });
-
   } catch (error) {
-    console.error('[ERROR] Submit Soil Test:', error);
+    console.error('[Farmer] Submit Soil Test Error:', error);
     res.status(500).json({ message: 'Failed to submit soil test', error: error.message });
   }
 };
+
+
 
 // Get My Soil Tests
 exports.getMySoilTests = async (req, res) => {
@@ -155,5 +155,16 @@ exports.getProfile = async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   if (!user) return res.status(404).json({ message: 'User not found' });
   res.json(user);
+};
+const IrrigationPlan = require('../models/IrrigationPlan');
+
+exports.getIrrigationPlans = async (req, res) => {
+  try {
+    const plans = await IrrigationPlan.find().sort({ createdAt: -1 });
+    res.json(plans);
+  } catch (error) {
+    console.error('Failed to fetch irrigation plans:', error.message);
+    res.status(500).json({ message: 'Failed to fetch irrigation plans' });
+  }
 };
 

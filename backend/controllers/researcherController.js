@@ -90,3 +90,38 @@ exports.getRuleAudit = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch soil rules' });
   }
 };
+
+exports.proposeRules = async (req, res) => {
+  try {
+    const {
+      pH,
+      moisture,
+      nitrogen,
+      phosphorus,
+      potassium,
+      cropRecommendation,
+      fertilizerRecommendation
+    } = req.body;
+
+    const newRuleProposal = new Recommendation({
+      pH,
+      moisture,
+      nitrogen,
+      phosphorus,
+      potassium,
+      cropSuggestion: cropRecommendation,
+      fertilizerSuggestion: fertilizerRecommendation,
+      status: 'pending',
+      source: 'proposed',
+      generatedBy: req.user.id
+    });
+    
+
+    await newRuleProposal.save();
+
+    res.status(201).json({ message: 'Rule proposed and pending admin approval' });
+  } catch (err) {
+    console.error('Error proposing rules:', err);
+    res.status(500).json({ message: 'Failed to propose new rules' });
+  }
+};

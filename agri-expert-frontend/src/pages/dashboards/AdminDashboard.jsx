@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import axios from '../../api/axiosInstance';
-import { FiUsers, FiDatabase, FiSettings, FiHome, FiBarChart2, FiTrash2, FiPlus, FiClock, FiCheck, FiX } from 'react-icons/fi';
+import {
+  FiUsers, FiDatabase, FiSettings, FiHome, FiBarChart2,
+  FiTrash2, FiPlus, FiClock, FiCheck, FiX
+} from 'react-icons/fi';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [soilTests, setSoilTests] = useState([]);
   const [rules, setRules] = useState({});
+  const [allRules, setAllRules] = useState([]); // ✅ NEW
   const [stats, setStats] = useState(null);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -21,6 +25,7 @@ const AdminDashboard = () => {
     pendingRecs: false
   });
 
+  // 🔄 Tab-based fetching
   useEffect(() => {
     if (activeTab === 'dashboard') fetchStats();
     if (activeTab === 'users') fetchUsers();
@@ -30,6 +35,7 @@ const AdminDashboard = () => {
     if (activeTab === 'pending-recs') fetchPendingRecommendations();
   }, [activeTab]);
 
+  // ✅ USERS
   const fetchUsers = async () => {
     setIsLoading(prev => ({ ...prev, users: true }));
     try {
@@ -42,6 +48,37 @@ const AdminDashboard = () => {
     }
   };
 
+  const deleteUser = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    try {
+      await axios.delete(`/admin/users/${id}`);
+      fetchUsers();
+      setMessage('User deleted successfully');
+    } catch {
+      setMessage('Failed to delete user');
+    }
+  };
+
+  const addUser = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const newUser = {
+      name: form.name.value,
+      email: form.email.value,
+      password: form.password.value,
+      role: form.role.value
+    };
+    try {
+      await axios.post('/admin/users', newUser);
+      fetchUsers();
+      form.reset();
+      setMessage('User added successfully');
+    } catch {
+      setMessage('Failed to add user');
+    }
+  };
+
+  // ✅ SOIL TESTS
   const fetchSoilTests = async () => {
     setIsLoading(prev => ({ ...prev, soilTests: true }));
     try {
@@ -54,11 +91,25 @@ const AdminDashboard = () => {
     }
   };
 
+  const deleteSoilTest = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this soil test?')) return;
+    try {
+      await axios.delete(`/admin/soiltests/${id}`);
+      fetchSoilTests();
+      setMessage('Soil test deleted successfully');
+    } catch {
+      setMessage('Failed to delete soil test');
+    }
+  };
+
+  // ✅ RULES
   const fetchRules = async () => {
     setIsLoading(prev => ({ ...prev, rules: true }));
     try {
       const res = await axios.get('/admin/rules');
-      setRules(res.data);
+      const data = Array.isArray(res.data) ? res.data : [res.data];
+      setAllRules(data);
+      setRules({});
     } catch {
       setMessage('Failed to fetch rules');
     } finally {
@@ -66,6 +117,46 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleRuleChange = (e) => {
+    const { name, value } = e.target;
+    const parts = name.split('.');
+    if (parts.length === 2) {
+      setRules(prev => ({
+        ...prev,
+        [parts[0]]: {
+          ...prev[parts[0]],
+          [parts[1]]: value
+        }
+      }));
+    } else {
+      setRules(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const saveRules = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post('/admin/rules', rules);
+      setMessage('✅ Rule added successfully');
+      setRules({});
+      fetchRules(); // reload
+    } catch {
+      setMessage('❌ Failed to add rule');
+    }
+  };
+
+  const deleteRule = async (ruleId) => {
+    if (!window.confirm('Delete this rule?')) return;
+    try {
+      await axios.delete(`/admin/rules/${ruleId}`);
+      setAllRules(prev => prev.filter(r => r._id !== ruleId));
+      setMessage('🗑 Rule deleted');
+    } catch {
+      setMessage('❌ Failed to delete rule');
+    }
+  };
+
+  // ✅ DASHBOARD STATS
   const fetchStats = async () => {
     setIsLoading(prev => ({ ...prev, stats: true }));
     try {
@@ -78,6 +169,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // ✅ PENDING
   const fetchPendingRules = async () => {
     setIsLoading(prev => ({ ...prev, pendingRules: true }));
     try {
@@ -99,61 +191,6 @@ const AdminDashboard = () => {
       setMessage('Failed to fetch pending recommendations');
     } finally {
       setIsLoading(prev => ({ ...prev, pendingRecs: false }));
-    }
-  };
-
-  const handleRuleChange = (e) => {
-    setRules({ ...rules, [e.target.name]: e.target.value });
-  };
-
-  const saveRules = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post('/admin/rules', rules);
-      setMessage('Rules updated successfully');
-    } catch {
-      setMessage('Failed to update rules');
-    }
-  };
-
-  const deleteUser = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-    try {
-      await axios.delete(`/admin/users/${id}`);
-      fetchUsers();
-      setMessage('User deleted successfully');
-    } catch {
-      setMessage('Failed to delete user');
-    }
-  };
-
-  const deleteSoilTest = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this soil test?')) return;
-    try {
-      await axios.delete(`/admin/soiltests/${id}`);
-      fetchSoilTests();
-      setMessage('Soil test deleted successfully');
-    } catch {
-      setMessage('Failed to delete soil test');
-    }
-  };
-
-  const addUser = async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const newUser = {
-      name: form.name.value,
-      email: form.email.value,
-      password: form.password.value,
-      role: form.role.value
-    };
-    try {
-      await axios.post('/admin/users', newUser);
-      fetchUsers();
-      form.reset();
-      setMessage('User added successfully');
-    } catch {
-      setMessage('Failed to add user');
     }
   };
 
@@ -510,72 +547,81 @@ const AdminDashboard = () => {
 
           {/* Rules Tab */}
           {activeTab === 'rules' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold mb-6">Soil Rule Configuration</h3>
-              {isLoading.rules ? (
-                <div className="flex justify-center items-center h-40">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                </div>
-              ) : (
-                <form onSubmit={saveRules} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Minimum pH</label>
-                      <input
-                        name="minPh"
-                        value={rules.minPh || ''}
-                        onChange={handleRuleChange}
-                        type="number"
-                        step="0.1"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Maximum pH</label>
-                      <input
-                        name="maxPh"
-                        value={rules.maxPh || ''}
-                        onChange={handleRuleChange}
-                        type="number"
-                        step="0.1"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Moisture</label>
-                      <input
-                        name="minMoisture"
-                        value={rules.minMoisture || ''}
-                        onChange={handleRuleChange}
-                        type="number"
-                        step="0.1"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Maximum Moisture</label>
-                      <input
-                        name="maxMoisture"
-                        value={rules.maxMoisture || ''}
-                        onChange={handleRuleChange}
-                        type="number"
-                        step="0.1"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="pt-4">
-                    <button
-                      type="submit"
-                      className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <h3 className="text-lg font-semibold mb-6">🧪 Configure Soil Recommendation Rule</h3>
+
+    {/* Form to Add New Rule */}
+    <form onSubmit={saveRules} className="space-y-4">
+      <div className="grid md:grid-cols-3 gap-4">
+        <input name="soilType" placeholder="Soil Type (e.g. Loamy)" value={rules.soilType || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" required />
+        <input name="cropSuggestion" placeholder="Crop Suggestion" value={rules.cropSuggestion || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" required />
+        <input name="fertilizerSuggestion" placeholder="Fertilizer Suggestion" value={rules.fertilizerSuggestion || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="irrigationRecommendation" placeholder="Irrigation Advice" value={rules.irrigationRecommendation || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4">
+        <input name="pH.min" placeholder="Min pH" type="number" step="0.1" value={rules.pH?.min || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="pH.max" placeholder="Max pH" type="number" step="0.1" value={rules.pH?.max || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="moisture.min" placeholder="Min Moisture" type="number" value={rules.moisture?.min || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="moisture.max" placeholder="Max Moisture" type="number" value={rules.moisture?.max || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="nitrogen.min" placeholder="Min Nitrogen" type="number" value={rules.nitrogen?.min || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="nitrogen.max" placeholder="Max Nitrogen" type="number" value={rules.nitrogen?.max || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="phosphorus.min" placeholder="Min Phosphorus" type="number" value={rules.phosphorus?.min || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="phosphorus.max" placeholder="Max Phosphorus" type="number" value={rules.phosphorus?.max || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="potassium.min" placeholder="Min Potassium" type="number" value={rules.potassium?.min || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+        <input name="potassium.max" placeholder="Max Potassium" type="number" value={rules.potassium?.max || ''} onChange={handleRuleChange} className="border px-3 py-2 rounded" />
+      </div>
+
+      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">💾 Save Rule</button>
+    </form>
+
+    {/* Existing Rules Table */}
+    <h4 className="text-md font-semibold mt-8 mb-2">📋 Existing Rules</h4>
+    {isLoading.rules ? (
+      <p className="text-sm text-gray-500">Loading...</p>
+    ) : (
+      <table className="w-full mt-2 border text-sm">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="px-2 py-1 border">Soil</th>
+            <th className="px-2 py-1 border">Crop</th>
+            <th className="px-2 py-1 border">NPK</th>
+            <th className="px-2 py-1 border">pH</th>
+            <th className="px-2 py-1 border">Moisture</th>
+            <th className="px-2 py-1 border">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        {allRules.map(rule => (
+  <tr key={rule._id}>
+    <td className="border px-2 py-1">{rule.soilType || '-'}</td>
+    <td className="border px-2 py-1">{rule.cropSuggestion || '-'}</td>
+
+    <td className="border px-2 py-1">
+      N: {rule.nitrogen?.min ?? '-'} - {rule.nitrogen?.max ?? '-'}<br />
+      P: {rule.phosphorus?.min ?? '-'} - {rule.phosphorus?.max ?? '-'}<br />
+      K: {rule.potassium?.min ?? '-'} - {rule.potassium?.max ?? '-'}
+    </td>
+
+    <td className="border px-2 py-1">
+      {rule.pH?.min ?? '-'} – {rule.pH?.max ?? '-'}
+    </td>
+
+    <td className="border px-2 py-1">
+      {rule.moisture?.min ?? '-'} – {rule.moisture?.max ?? '-'}
+    </td>
+
+    <td className="border px-2 py-1">
+      <button onClick={() => deleteRule(rule._id)} className="text-red-500 hover:underline">🗑 Delete</button>
+    </td>
+  </tr>
+))}
+
+        </tbody>
+      </table>
+    )}
+  </div>
+)}
 
           {/* Pending Rules Tab */}
           {activeTab === 'pending-rules' && (
