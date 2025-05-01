@@ -4,7 +4,7 @@ const recommendationSchema = new mongoose.Schema({
   soilTest: { type: mongoose.Schema.Types.ObjectId, ref: 'SoilTest', required: true },
   cropSuggestion: { type: String, required: true },
   fertilizerSuggestion: { type: String, required: true },
-  generatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Admin
+  generatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdOn: { type: Date, default: Date.now }
 });
 

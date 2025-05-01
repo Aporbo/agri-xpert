@@ -1,0 +1,513 @@
+import React, { useEffect, useState } from 'react';
+import axios from '../../api/axiosInstance';
+import { FiUsers, FiDatabase, FiSettings, FiHome, FiBarChart2, FiTrash2, FiPlus } from 'react-icons/fi';
+
+const AdminDashboard = () => {
+  const [users, setUsers] = useState([]);
+  const [soilTests, setSoilTests] = useState([]);
+  const [rules, setRules] = useState({});
+  const [stats, setStats] = useState(null);
+  const [message, setMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeRecommendation, setActiveRecommendation] = useState(null);
+  const [isLoading, setIsLoading] = useState({
+    users: false,
+    soilTests: false,
+    rules: false,
+    stats: false
+  });
+
+  useEffect(() => {
+    if (activeTab === 'dashboard') fetchStats();
+    if (activeTab === 'users') fetchUsers();
+    if (activeTab === 'soiltests') fetchSoilTests();
+    if (activeTab === 'rules') fetchRules();
+  }, [activeTab]);
+
+  const fetchUsers = async () => {
+    setIsLoading(prev => ({ ...prev, users: true }));
+    try {
+      const res = await axios.get('/admin/users');
+      setUsers(res.data);
+    } catch {
+      setMessage('Failed to fetch users');
+    } finally {
+      setIsLoading(prev => ({ ...prev, users: false }));
+    }
+  };
+
+  const fetchSoilTests = async () => {
+    setIsLoading(prev => ({ ...prev, soilTests: true }));
+    try {
+      const res = await axios.get('/admin/soiltests');
+      setSoilTests(res.data);
+    } catch {
+      setMessage('Failed to fetch soil tests');
+    } finally {
+      setIsLoading(prev => ({ ...prev, soilTests: false }));
+    }
+  };
+
+  const fetchRules = async () => {
+    setIsLoading(prev => ({ ...prev, rules: true }));
+    try {
+      const res = await axios.get('/admin/rules');
+      setRules(res.data);
+    } catch {
+      setMessage('Failed to fetch rules');
+    } finally {
+      setIsLoading(prev => ({ ...prev, rules: false }));
+    }
+  };
+
+  const fetchStats = async () => {
+    setIsLoading(prev => ({ ...prev, stats: true }));
+    try {
+      const res = await axios.get('/admin/stats');
+      setStats(res.data);
+    } catch {
+      setMessage('Failed to fetch summary stats');
+    } finally {
+      setIsLoading(prev => ({ ...prev, stats: false }));
+    }
+  };
+
+  const handleRuleChange = (e) => {
+    setRules({ ...rules, [e.target.name]: e.target.value });
+  };
+
+  const saveRules = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post('/admin/rules', rules);
+      setMessage('Rules updated successfully');
+    } catch {
+      setMessage('Failed to update rules');
+    }
+  };
+
+  const deleteUser = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    try {
+      await axios.delete(`/admin/users/${id}`);
+      fetchUsers();
+      setMessage('User deleted successfully');
+    } catch {
+      setMessage('Failed to delete user');
+    }
+  };
+
+  const deleteSoilTest = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this soil test?')) return;
+    try {
+      await axios.delete(`/admin/soiltests/${id}`);
+      fetchSoilTests();
+      setMessage('Soil test deleted successfully');
+    } catch {
+      setMessage('Failed to delete soil test');
+    }
+  };
+
+  const addUser = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const newUser = {
+      name: form.name.value,
+      email: form.email.value,
+      password: form.password.value,
+      role: form.role.value
+    };
+    try {
+      await axios.post('/admin/users', newUser);
+      fetchUsers();
+      form.reset();
+      setMessage('User added successfully');
+    } catch {
+      setMessage('Failed to add user');
+    }
+  };
+
+  const viewRecommendation = async (soilTestId) => {
+    try {
+      const res = await axios.get(`/farmer/recommendation/${soilTestId}`);
+      setActiveRecommendation({ ...res.data, soilTestId });
+    } catch {
+      setActiveRecommendation({ error: true, soilTestId });
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-64 bg-white shadow-md">
+        <div className="p-4 border-b border-gray-200">
+          <h1 className="text-xl font-bold text-blue-600">AgriExpert Admin</h1>
+        </div>
+        <nav className="p-4 space-y-1">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex items-center w-full p-2 rounded-lg ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'}`}
+          >
+            <FiHome className="mr-3" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center w-full p-2 rounded-lg ${activeTab === 'users' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'}`}
+          >
+            <FiUsers className="mr-3" />
+            User Management
+          </button>
+          <button
+            onClick={() => setActiveTab('soiltests')}
+            className={`flex items-center w-full p-2 rounded-lg ${activeTab === 'soiltests' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'}`}
+          >
+            <FiDatabase className="mr-3" />
+            Soil Tests
+          </button>
+          <button
+            onClick={() => setActiveTab('rules')}
+            className={`flex items-center w-full p-2 rounded-lg ${activeTab === 'rules' ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-100'}`}
+          >
+            <FiSettings className="mr-3" />
+            Soil Rules
+          </button>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="p-6 max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">
+              {activeTab === 'dashboard' && 'Dashboard'}
+              {activeTab === 'users' && 'User Management'}
+              {activeTab === 'soiltests' && 'Soil Tests'}
+              {activeTab === 'rules' && 'Soil Rule Settings'}
+            </h2>
+            {message && (
+              <div className={`px-4 py-2 rounded ${message.includes('Failed') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                {message}
+              </div>
+            )}
+          </div>
+
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              {isLoading.stats ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : (
+                stats && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                          <FiUsers size={24} />
+                        </div>
+                        <div className="ml-4">
+                          <h3 className="text-lg font-medium text-gray-500">Total Users</h3>
+                          <p className="text-3xl font-bold">{stats.users.total}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-blue-50 p-2 rounded">
+                          <p className="text-blue-600">Farmers</p>
+                          <p className="font-medium">{stats.users.farmers}</p>
+                        </div>
+                        <div className="bg-purple-50 p-2 rounded">
+                          <p className="text-purple-600">Researchers</p>
+                          <p className="font-medium">{stats.users.researchers}</p>
+                        </div>
+                        <div className="bg-green-50 p-2 rounded">
+                          <p className="text-green-600">Govt Officials</p>
+                          <p className="font-medium">{stats.users.govt}</p>
+                        </div>
+                        <div className="bg-orange-50 p-2 rounded">
+                          <p className="text-orange-600">Admins</p>
+                          <p className="font-medium">{stats.users.admins}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-green-100 text-green-600">
+                          <FiDatabase size={24} />
+                        </div>
+                        <div className="ml-4">
+                          <h3 className="text-lg font-medium text-gray-500">Soil Tests</h3>
+                          <p className="text-3xl font-bold">{stats.tests}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+                          <FiBarChart2 size={24} />
+                        </div>
+                        <div className="ml-4">
+                          <h3 className="text-lg font-medium text-gray-500">Recommendations</h3>
+                          <p className="text-3xl font-bold">{stats.recommendations}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Users Tab */}
+          {activeTab === 'users' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold">Add New User</h3>
+                <form onSubmit={addUser} className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
+                  <input
+                    name="name"
+                    placeholder="Full Name"
+                    required
+                    className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="Email"
+                    required
+                    className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <input
+                    name="password"
+                    type="password"
+                    placeholder="Password"
+                    required
+                    className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <select
+                    name="role"
+                    required
+                    className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Role</option>
+                    <option value="FARMER">Farmer</option>
+                    <option value="RESEARCHER">Researcher</option>
+                    <option value="GOVT_OFFICIAL">Government Official</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    <FiPlus /> Add User
+                  </button>
+                </form>
+              </div>
+
+              <div className="divide-y divide-gray-200">
+                {isLoading.users ? (
+                  <div className="flex justify-center items-center p-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  </div>
+                ) : users.length > 0 ? (
+                  users.map(user => (
+                    <div key={user._id} className="p-4 hover:bg-gray-50 flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{user.name}</p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                        <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
+                          user.role === 'FARMER' ? 'bg-green-100 text-green-800' :
+                          user.role === 'RESEARCHER' ? 'bg-blue-100 text-blue-800' :
+                          user.role === 'GOVT_OFFICIAL' ? 'bg-purple-100 text-purple-800' :
+                          'bg-orange-100 text-orange-800'
+                        }`}>
+                          {user.role.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => deleteUser(user._id)}
+                        className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50"
+                        title="Delete User"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-gray-500">
+                    No users found
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Soil Tests Tab */}
+          {activeTab === 'soiltests' && (
+            <div className="space-y-6">
+              {isLoading.soilTests ? (
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : soilTests.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {soilTests.map(test => (
+                    <div key={test._id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium text-gray-900">Soil Test #{test._id.slice(-6)}</h4>
+                          <p className="text-sm text-gray-500">By {test.user?.name || 'Unknown'}</p>
+                        </div>
+                        <button
+                          onClick={() => deleteSoilTest(test._id)}
+                          className="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50"
+                          title="Delete Test"
+                        >
+                          <FiTrash2 size={18} />
+                        </button>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-500">Soil Type</p>
+                          <p className="font-medium">{test.soilType}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">pH Level</p>
+                          <p className="font-medium">{test.pH}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Moisture</p>
+                          <p className="font-medium">{test.moisture}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Nitrogen (N)</p>
+                          <p className="font-medium">{test.nitrogen}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Phosphorus (P)</p>
+                          <p className="font-medium">{test.phosphorus}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Potassium (K)</p>
+                          <p className="font-medium">{test.potassium}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <button
+                          onClick={() => viewRecommendation(test._id)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          {activeRecommendation?.soilTestId === test._id ? 'Hide Recommendation' : 'View Recommendation'}
+                        </button>
+
+                        {activeRecommendation?.soilTestId === test._id && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                            {activeRecommendation.error ? (
+                              <p className="text-yellow-600">No recommendation found for this test.</p>
+                            ) : (
+                              <>
+                                <div className="mb-2">
+                                  <p className="text-sm text-gray-500">Recommended Crop</p>
+                                  <p className="font-medium">{activeRecommendation.cropSuggestion}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-gray-500">Recommended Fertilizer</p>
+                                  <p className="font-medium">{activeRecommendation.fertilizerSuggestion}</p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+                  <p className="text-gray-500">No soil tests found</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Rules Tab */}
+          {activeTab === 'rules' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold mb-6">Soil Rule Configuration</h3>
+              {isLoading.rules ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : (
+                <form onSubmit={saveRules} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Minimum pH</label>
+                      <input
+                        name="minPh"
+                        value={rules.minPh || ''}
+                        onChange={handleRuleChange}
+                        type="number"
+                        step="0.1"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Maximum pH</label>
+                      <input
+                        name="maxPh"
+                        value={rules.maxPh || ''}
+                        onChange={handleRuleChange}
+                        type="number"
+                        step="0.1"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Moisture</label>
+                      <input
+                        name="minMoisture"
+                        value={rules.minMoisture || ''}
+                        onChange={handleRuleChange}
+                        type="number"
+                        step="0.1"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Maximum Moisture</label>
+                      <input
+                        name="maxMoisture"
+                        value={rules.maxMoisture || ''}
+                        onChange={handleRuleChange}
+                        type="number"
+                        step="0.1"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4">
+                    <button
+                      type="submit"
+                      className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;

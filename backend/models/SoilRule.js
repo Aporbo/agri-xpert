@@ -1,15 +1,15 @@
 const mongoose = require('mongoose');
 
 const soilRuleSchema = new mongoose.Schema({
-  minPh: Number,
-  maxPh: Number,
-  minMoisture: Number,
-  maxMoisture: Number,
-  nitrogenRange: { type: [Number], default: [0, 100] },
-  phosphorusRange: { type: [Number], default: [0, 100] },
-  potassiumRange: { type: [Number], default: [0, 100] },
+  pH: { min: Number, max: Number },
+  moisture: { min: Number, max: Number },
+  nitrogen: { min: Number, max: Number },
+  phosphorus: { min: Number, max: Number },
+  potassium: { min: Number, max: Number },
+  cropSuggestion: String,
+  fertilizerSuggestion: String,
+  irrigationRecommendation: String,
   updatedOn: { type: Date, default: Date.now }
 });
 
-// ✅ Check if model already exists before creating
-module.exports = mongoose.models.SoilRule || mongoose.model('SoilRule', soilRuleSchema);
+module.exports = mongoose.model('SoilRule', soilRuleSchema);
