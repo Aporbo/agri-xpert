@@ -173,12 +173,25 @@ const AdminDashboard = () => {
   const fetchPendingRules = async () => {
     setIsLoading(prev => ({ ...prev, pendingRules: true }));
     try {
-      const res = await axios.get('/admin/pending-rules');
+      const res = await axios.get('/admin/rules/pending'); // Changed from '/admin/pending-rules'
       setPendingRules(res.data);
-    } catch {
-      setMessage('Failed to fetch pending rules');
+      setMessage(''); // Clear any previous error messages
+    } catch (err) {
+      console.error('Error fetching pending rules:', err);
+      setMessage(err.response?.data?.message || 'Failed to fetch pending rules');
     } finally {
       setIsLoading(prev => ({ ...prev, pendingRules: false }));
+    }
+  };
+  
+  const reviewRuleProposal = async (id, action) => {
+    try {
+      const res = await axios.put(`/admin/rules/review/${id}`, { action }); // Changed from '/admin/review-rule/${id}'
+      fetchPendingRules(); // Refresh the list
+      setMessage(res.data.message);
+    } catch (err) {
+      console.error('Error reviewing rule:', err);
+      setMessage(err.response?.data?.message || 'Failed to process rule proposal');
     }
   };
 
@@ -203,15 +216,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const reviewRuleProposal = async (id, action) => {
-    try {
-      await axios.put(`/admin/review-rule/${id}`, { action });
-      fetchPendingRules();
-      setMessage(`Rule proposal ${action === 'approve' ? 'approved' : 'rejected'}`);
-    } catch {
-      setMessage('Failed to process rule proposal');
-    }
-  };
 
   const approveRecommendation = async (id) => {
     try {

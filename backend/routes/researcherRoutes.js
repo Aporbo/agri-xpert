@@ -2,24 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken, authorizeRoles } = require('../middlewares/authMiddleware');
 const {
-  getWeather,
-  getIrrigationPlans,
   getSoilInsights,
   getRecommendationTrends,
   getRuleAudit,
   proposeRules,
-  getPendingRecommendations // ✅ Add this line
+  getAllSoilTests,
+  updateSoilTest
 } = require('../controllers/researcherController');
 
-// ✅ Allow researchers only
-router.get('/weather', verifyToken, authorizeRoles('RESEARCHER'), getWeather);
+// Soil data analysis routes
 router.get('/soil-insights', verifyToken, authorizeRoles('RESEARCHER'), getSoilInsights);
 router.get('/trends', verifyToken, authorizeRoles('RESEARCHER'), getRecommendationTrends);
 router.get('/rules', verifyToken, authorizeRoles('RESEARCHER'), getRuleAudit);
-//router.get('/recommendations-for-review', verifyToken, authorizeRoles('RESEARCHER'), getPendingRecommendations); // ✅ New route
 router.post('/propose-rules', verifyToken, authorizeRoles('RESEARCHER'), proposeRules);
 
-// ✅ Shared route
-router.get('/irrigation', verifyToken, authorizeRoles('FARMER', 'RESEARCHER'), getIrrigationPlans);
+// Soil test management routes
+router.get('/soiltests', verifyToken, authorizeRoles('RESEARCHER'), getAllSoilTests);
+router.put('/soiltests/:id', verifyToken, authorizeRoles('RESEARCHER'), updateSoilTest);
 
 module.exports = router;

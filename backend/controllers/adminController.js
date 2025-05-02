@@ -142,34 +142,111 @@ exports.getRules = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch rules' });
   }
 };
-
-
 exports.getPendingRules = async (req, res) => {
   try {
-    const rules = await SoilRule.find({ status: 'PENDING' }).populate('createdBy', 'name email');
+    const rules = await SoilRule.find({ status: 'PENDING' })
+      .populate('createdBy', 'name email')
+      .sort({ updatedOn: -1 });
+      
     res.json(rules);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch pending rules' });
+    console.error('Error fetching pending rules:', err);
+    res.status(500).json({ 
+      message: 'Failed to fetch pending rules',
+      error: err.message 
+    });
   }
 };
 
 exports.reviewRuleProposal = async (req, res) => {
   try {
-    const { status } = req.body;
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
+    const { action } = req.body;
+    const validActions = ['approve', 'reject'];
+    
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ message: 'Invalid action. Must be "approve" or "reject"' });
     }
 
-    const rule = await SoilRule.findByIdAndUpdate(
+    const status = action === 'approve' ? 'APPROVED' : 'REJECTED';
+    const updatedRule = await SoilRule.findByIdAndUpdate(
       req.params.id,
-      { status, updatedOn: new Date() },
+      { 
+        status,
+        updatedOn: new Date(),
+        reviewedBy: req.user.id 
+      },
       { new: true }
-    );
+    ).populate('createdBy', 'name email');
 
-    if (!rule) return res.status(404).json({ message: 'Rule not found' });
+    if (!updatedRule) {
+      return res.status(404).json({ message: 'Rule not found' });
+    }
 
-    res.json({ message: `Rule ${status.toLowerCase()}`, rule });
+    res.json({ 
+      message: `Rule ${status.toLowerCase()} successfully`,
+      rule: updatedRule 
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update rule' });
+    console.error('Error reviewing rule proposal:', err);
+    res.status(500).json({ 
+      message: 'Failed to process rule proposal',
+      error: err.message 
+    });
   }
 };
+exports.getPendingRecommendations = async (req, res) => {
+  try {
+    const recommendations = await Recommendation.find({ status: 'pending' })
+      .populate('soilTest')
+      .populate('generatedBy', 'name email')
+      .sort({ createdAt: -1 });
+      
+    res.json(recommendations);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch pending recommendations', error: err.message });
+  }
+};
+
+exports.reviewRecommendation = async (req, res) => {
+  try {
+    const { action, cropSuggestion, fertilizerSuggestion } = req.body;
+    
+    const recommendation = await Recommendation.findById(req.params.id);
+    if (!recommendation) {
+      return res.status(404).json({ message: 'Recommendation not found' });
+    }
+
+    if (action === 'approve') {
+      recommendation.status = 'approved';
+      recommendation.cropSuggestion = cropSuggestion;
+      recommendation.fertilizerSuggestion = fertilizerSuggestion;
+      recommendation.reviewedBy = req.user.id;
+      
+      // Optionally create a new rule from this approval
+      const newRule = new SoilRule({
+        soilType: recommendation.soilTest.soilType,
+        pH: recommendation.pH,
+        moisture: recommendation.moisture,
+        nitrogen: recommendation.nitrogen,
+        phosphorus: recommendation.phosphorus,
+        potassium: recommendation.potassium,
+        cropSuggestion,
+        fertilizerSuggestion,
+        status: 'APPROVED',
+        createdBy: req.user.id
+      });
+      await newRule.save();
+    } else {
+      recommendation.status = 'rejected';
+      recommendation.reviewedBy = req.user.id;
+    }
+
+    await recommendation.save();
+    res.json({ message: `Recommendation ${action}d`, recommendation });
+
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to process recommendation', error: err.message });
+  }
+};
+
+

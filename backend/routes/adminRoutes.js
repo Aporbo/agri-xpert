@@ -46,12 +46,12 @@ router.delete('/rules/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete rule' });
   }
 });
-
-// ✅ Rule Moderation
+// In adminRoutes.js
+router.get('/pending-recommendations', verifyToken, authorizeRoles('ADMIN'), adminController.getPendingRecommendations);
+router.put('/recommendations/:id/review', verifyToken, authorizeRoles('ADMIN'), adminController.reviewRecommendation);
+// Rule Moderation
 router.get('/rules/pending', adminController.getPendingRules);
 router.put('/rules/review/:id', adminController.reviewRuleProposal);
-
-// ✅ Summary Stats
 router.get('/stats', async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();

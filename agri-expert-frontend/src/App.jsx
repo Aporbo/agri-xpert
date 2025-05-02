@@ -14,6 +14,7 @@ import FarmerProfile from './components/FarmerProfile';
 import ProtectedRoute from './auth/ProtectedRoute';
 import Navbar from './components/Navbar';
 
+
 const App = () => {
   return (
     <Router>
@@ -45,6 +46,7 @@ const App = () => {
         <Route path="/govt_official" element={<ProtectedRoute allowedRoles={['GOVT_OFFICIAL']} />}>
           <Route index element={<GovtDashboard />} />
         </Route>
+
 
         {/* Fallback Route */}
         <Route path="*" element={<h2 style={{ textAlign: 'center' }}>404 - Page Not Found</h2>} />

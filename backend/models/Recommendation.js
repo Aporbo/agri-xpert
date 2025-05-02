@@ -1,14 +1,37 @@
-const mongoose = require('mongoose');
+const mongoose = require('mongoose'); // Add this import at the top
 
 const recommendationSchema = new mongoose.Schema({
-  soilTest: { type: mongoose.Schema.Types.ObjectId, ref: 'SoilTest' }, // ⬅️ now optional
-  cropSuggestion: { type: String, required: true },
-  fertilizerSuggestion: { type: String, required: true },
-  generatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  createdOn: { type: Date, default: Date.now },
+  soilTest: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'SoilTest',
+    required: function() {
+      return this.source !== 'proposed';
+    }
+  },
+  cropSuggestion: { 
+    type: String, 
+    required: true 
+  },
+  fertilizerSuggestion: { 
+    type: String, 
+    required: true 
+  },
+  irrigationRecommendation: {
+    type: String,
+    required: true
+  },
+  generatedBy: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User',
+    required: true 
+  },
+  createdOn: { 
+    type: Date, 
+    default: Date.now 
+  },
   source: { 
     type: String, 
-    enum: ['manual', 'ml', 'modified', 'proposed'], // ⬅️ added 'proposed'
+    enum: ['manual', 'ml', 'modified', 'rule', 'proposed'], 
     default: 'manual' 
   },
   status: { 
@@ -16,33 +39,63 @@ const recommendationSchema = new mongoose.Schema({
     enum: ['approved', 'pending', 'rejected'], 
     default: 'approved' 
   },
-  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  mlModelUsed: { type: mongoose.Schema.Types.ObjectId, ref: 'MLModel' },
-  confidenceScore: Number,
-
-  // ✅ New fields for proposed thresholds:
+  reviewedBy: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User' 
+  },
+  
+  // Soil parameter ranges
   pH: {
-    min: Number,
-    max: Number
+    min: { type: Number, min: 0, max: 14 },
+    max: { type: Number, min: 0, max: 14 }
   },
   moisture: {
-    min: Number,
-    max: Number
+    min: { type: Number, min: 0 },
+    max: { type: Number, min: 0 }
   },
   nitrogen: {
-    min: Number,
-    max: Number
+    min: { type: Number, min: 0 },
+    max: { type: Number, min: 0 }
   },
   phosphorus: {
-    min: Number,
-    max: Number
+    min: { type: Number, min: 0 },
+    max: { type: Number, min: 0 }
   },
   potassium: {
-    min: Number,
-    max: Number
+    min: { type: Number, min: 0 },
+    max: { type: Number, min: 0 }
   },
+  
+  // Additional info
+  notes: String,
+  reviewNotes: String,
+  updatedAt: { 
+    type: Date, 
+    default: Date.now 
+  }
+}, {
+  timestamps: true, // Adds createdAt and updatedAt automatically
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-  createdAt: { type: Date, default: Date.now }
+// Virtual for display name
+recommendationSchema.virtual('displayName').get(function() {
+  return `${this.cropSuggestion} (${this.status})`;
+});
+
+// Indexes for better query performance
+recommendationSchema.index({ soilTest: 1 });
+recommendationSchema.index({ status: 1 });
+recommendationSchema.index({ generatedBy: 1 });
+recommendationSchema.index({ reviewedBy: 1 });
+recommendationSchema.index({ createdAt: -1 });
+recommendationSchema.index({ updatedAt: -1 });
+
+// Pre-save hook to update timestamps
+recommendationSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
 });
 
 module.exports = mongoose.model('Recommendation', recommendationSchema);

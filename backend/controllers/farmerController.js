@@ -9,62 +9,85 @@ const User = require('../models/User');
 exports.submitSoilTest = async (req, res) => {
   try {
     const { soilType, pH, moisture, nitrogen, phosphorus, potassium } = req.body;
-
-    // 1. Save the soil test
+    
+    // Create and save soil test
     const soilTest = new SoilTest({
-      user: req.user.id,
       soilType,
       pH,
       moisture,
       nitrogen,
       phosphorus,
-      potassium
+      potassium,
+      user: req.user.id
     });
-
     await soilTest.save();
 
-    // 2. Try rule-based matching
-    const allRules = await SoilRule.find({});
-
-    let matchedRule = allRules.find(rule => {
-      return (
-        rule.soilType === soilType &&
-        pH >= rule.pH.min && pH <= rule.pH.max &&
-        moisture >= rule.moisture.min && moisture <= rule.moisture.max &&
-        nitrogen >= rule.nitrogen.min && nitrogen <= rule.nitrogen.max &&
-        phosphorus >= rule.phosphorus.min && phosphorus <= rule.phosphorus.max &&
-        potassium >= rule.potassium.min && potassium <= rule.potassium.max
-      );
+    // Check if this matches any approved rules
+    const matchingRule = await SoilRule.findOne({
+      status: 'APPROVED',
+      soilType,
+      'pH.min': { $lte: pH },
+      'pH.max': { $gte: pH },
+      'moisture.min': { $lte: moisture },
+      'moisture.max': { $gte: moisture },
+      'nitrogen.min': { $lte: nitrogen },
+      'nitrogen.max': { $gte: nitrogen },
+      'phosphorus.min': { $lte: phosphorus },
+      'phosphorus.max': { $gte: phosphorus },
+      'potassium.min': { $lte: potassium },
+      'potassium.max': { $gte: potassium }
     });
 
-    let crop = 'N/A';
-    let fertilizer = 'N/A';
-
-    if (matchedRule) {
-      crop = matchedRule.cropSuggestion;
-      fertilizer = matchedRule.fertilizerSuggestion;
-      irrigation = matchedRule.irrigationRecommendation;
+    let recommendation;
+    if (matchingRule) {
+      // Create approved recommendation based on matching rule
+      recommendation = new Recommendation({
+        soilTest: soilTest._id,
+        cropSuggestion: matchingRule.cropSuggestion,
+        fertilizerSuggestion: matchingRule.fertilizerSuggestion,
+        irrigationRecommendation: matchingRule.irrigationRecommendation || 'Standard irrigation',
+        generatedBy: null, // System-generated
+        source: 'rule',
+        status: 'approved'
+      });
+    } else {
+      // Create pending recommendation for admin review
+      recommendation = new Recommendation({
+        soilTest: soilTest._id,
+        cropSuggestion: 'Pending admin review',
+        fertilizerSuggestion: 'Pending admin review',
+        irrigationRecommendation: 'Pending admin review',
+        generatedBy: req.user.id,
+        source: 'manual',
+        status: 'pending',
+        // Save the input values for reference
+        pH: { min: pH, max: pH },
+        moisture: { min: moisture, max: moisture },
+        nitrogen: { min: nitrogen, max: nitrogen },
+        phosphorus: { min: phosphorus, max: phosphorus },
+        potassium: { min: potassium, max: potassium }
+      });
     }
-
-    // 3. Save recommendation
-    const recommendation = new Recommendation({
-      soilTest: soilTest._id,
-      cropSuggestion: crop,
-      fertilizerSuggestion: fertilizer,
-      irrigationRecommendation: irrigation, // ✅ include this
-      generatedBy: req.user.id
-    });
 
     await recommendation.save();
 
-    res.status(201).json({ message: 'Soil Test submitted successfully', soilTest });
-  } catch (error) {
-    console.error('[Farmer] Submit Soil Test Error:', error);
-    res.status(500).json({ message: 'Failed to submit soil test', error: error.message });
+    res.status(201).json({
+      message: matchingRule 
+        ? 'Soil test submitted with automatic recommendation'
+        : 'Soil test submitted for admin review',
+      soilTest,
+      recommendation
+    });
+
+  } catch (err) {
+    console.error('Error submitting soil test:', err);
+    res.status(500).json({ 
+      message: 'Failed to submit soil test', 
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
-
-
 
 // Get My Soil Tests
 exports.getMySoilTests = async (req, res) => {
@@ -155,16 +178,5 @@ exports.getProfile = async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   if (!user) return res.status(404).json({ message: 'User not found' });
   res.json(user);
-};
-const IrrigationPlan = require('../models/IrrigationPlan');
-
-exports.getIrrigationPlans = async (req, res) => {
-  try {
-    const plans = await IrrigationPlan.find().sort({ createdAt: -1 });
-    res.json(plans);
-  } catch (error) {
-    console.error('Failed to fetch irrigation plans:', error.message);
-    res.status(500).json({ message: 'Failed to fetch irrigation plans' });
-  }
 };
 
